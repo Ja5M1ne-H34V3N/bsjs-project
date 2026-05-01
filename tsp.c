@@ -37,7 +37,7 @@ int main()
 	static int i = 0;
 	timeStart = timeNow = timeTemp = clock();
 	init();
-	for (;;)
+	for (;;)//进行无限次循环
 	{
 		for (j = 0; j<xCity; j++)temp[j] = colony[i][j];
 		disChange = 0; pos_flag = 0;
@@ -143,32 +143,32 @@ void init()//初始化种群的信息
 		if (j<i)  city_dis[i][j] = city_dis[j][i];
 	}// 初始化城市的距离矩阵，表示城市之间的距离
 
-	mod = xCity;
-	for (i = 0; i<xCity; i++)array[i] = i;     //    init colony[][]     
-	for (i = 0; i<xColony; i++, mod = xCity)
-	for (j = 0; j<xCity; j++)
+	mod = xCity;//  我们将xcity 也就是城市的总数作为后续计算的初始取模标准
+	for (i = 0; i<xCity; i++)array[i] = i;     //初始化城市选取列表array     
+	for (i = 0; i<xColony; i++, mod = xCity) // 接下来定义当前种群里的每一个个体 根据变量xColony的信息，我们知道本次种群初始设置为100个，同时在每定义一个新的个体的时候，都重置模系数的值为城市总数
+	for (j = 0; j<xCity; j++)  // 接下来进行xcity次循环 旨在填好某个特定的个体
 	{
-		sign = rand() % mod;
-		colony[i][j] = array[sign];
-		t = array[mod - 1];
+		sign = rand() % mod; //定义sign值，意为随机选取一个城市作为填入这个个体这一位的城市
+		colony[i][j] = array[sign]; //i指的是特定的个体 j指的是个体中第j个城市，这里被填入sign 也就是刚刚随机出来的城市
+		t = array[mod - 1];  
 		array[mod - 1] = array[sign];
-		array[sign] = t;
-		mod--;
-		if (mod == 1) colony[i][++j] = array[0];
-	}
+		array[sign] = t;//这三个是换位的代码，将array 也就是城市列表第mod - 1 个城市和刚刚选中的随机城市互换
+		mod--; //将mod见一，也就是下一轮循环中，只在array的前mod - 1个城市里进行随机抽取，这样做的目的是将已经被选择的城市移到后面就能实现其不会再被选择（比如mod系数是5肯定不会出现结果6）
+		if (mod == 1) colony[i][++j] = array[0]; //当mod是1的时候，直接选剩下的最后一个城市就好了，方便快捷
+	}// 这样 经过i次循环 整个种群的个体就定义好了
 
-	for (i = 0; i<xColony; i++)		    /*    init dis_p[]       */
+	for (i = 0; i<xColony; i++)	// 接下来遍历整个种群	    /*    init dis_p[]       */
 	{
-		dis_p[i] = 0;
+		dis_p[i] = 0;//dis_p保存着每个种群的全部距离 ，在算法里就是适应值
 		for (j = 0; j<xCity - 1; j++)
 			dis_p[i] = dis_p[i] + city_dis[*(*(colony + i) + j)][*(*(colony + i) + j + 1)];
 		dis_p[i] = dis_p[i] + city_dis[**(colony + i)][*(*(colony + i) + xCity - 1)];
-	}
+	} //计算一个个体的具体的适应值，这里就是按照个体保存的城市顺序走一圈的总距离
 
 	ibest = 0; sumbest = dis_p[0];	    /*  init ibest & sumbest */
 	sumTemp = sumbest * 5;
 	GenNum = 0;	Ni = 0;               /*   initialize GunNum & Ni    */
-	printf("init success!!!\n");
+	printf("init success!!!\n");//将最强个体ibest初始化为0号个体 最好长度初始化为第一个个体的长度 初始化代数计数器为0
 }
 
 void invert(int pos_start, int pos_end)
