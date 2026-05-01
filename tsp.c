@@ -112,13 +112,13 @@ void select1()
 			colony[j][k] = colony[N_COLONY + j][k];
 	}
 }
-void init()
+void init()//初始化种群的信息
 {
 	int i, j, t, sign, mod, array[CITY];
 	double x, y;
 	double d;
 	FILE *fp;
-	srand((unsigned)time(NULL));
+	srand((unsigned)time(NULL));//设置随机数
 	if ((fp = fopen(FILE_PATH)) == NULL)exit(0);
 	fscanf(fp, "%d", &xCity);
 	for (i = 0; i<xCity; i++)      /*  init cityXY[][]  */
@@ -127,7 +127,7 @@ void init()
 		cityXY[i][0] = x;
 		cityXY[i][1] = y;
 	}
-	fclose(fp);
+	fclose(fp); //读取城市信息，并将其坐标存在数组中
 
 	for (i = 0; i<xCity; i++)    /*  init city_dis[] */
 	for (j = 0; j<xCity; j++)
@@ -141,7 +141,7 @@ void init()
 		}
 		if (j == i) { city_dis[i][j] = 0; continue; }
 		if (j<i)  city_dis[i][j] = city_dis[j][i];
-	}
+	}// 初始化城市的距离矩阵，表示城市之间的距离
 
 	mod = xCity;
 	for (i = 0; i<xCity; i++)array[i] = i;     //    init colony[][]     
