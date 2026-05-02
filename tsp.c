@@ -65,43 +65,43 @@ int main()
 			k2 = temp[(pos_C + 1) % xCity];
 			l1 = temp[pos_C1];
 			l2 = temp[(pos_C1 + 1) % xCity];//分别提取pos_C 和 pos_C1及其各自下一个城市
-			disChange += city_dis[k1][l1] + city_dis[k2][l2] - city_dis[k1][k2] - city_dis[l1][l2];
-			invert(pos_C, pos_C1);
-			pos_flag++;
+			disChange += city_dis[k1][l1] + city_dis[k2][l2] - city_dis[k1][k2] - city_dis[l1][l2]; //记录改变的城市距离值为交换两条边后的长度变化
+			invert(pos_C, pos_C1); //反转C到C1之间的路径
+			pos_flag++; //泽这个值加一
 			if (pos_flag>xCity - 1)
-				break;  ////////////
+				break;  //有效变化城市-1次后 结束变异
 			pos_C++;
-			if (pos_C >= xCity)pos_C = 0;                 /**********************/
+			if (pos_C >= xCity)pos_C = 0;      //给posC进行加一取模操作           /**********************/
 		}
-		dis_p[N_COLONY + i] = dis_p[i] + disChange;
-		disChange = 0;
+		dis_p[N_COLONY + i] = dis_p[i] + disChange;//记录个体i进行优化后的总距离(这里disp保存的是一个种群所有个体优化前后的总距离 所以 要加一个种群值再存储)
+		disChange = 0;//重置dischange
 		for (j = 0; j<xCity; j++)
-			colony[N_COLONY + i][j] = temp[j];
-		i++;
-		if (i >= xColony)//�˴��Ǳ���+�Ӵ��� 
+			colony[N_COLONY + i][j] = temp[j];//保存temp为当前种群i号个体的信息
+		i++;//i号个体的记录+1
+		if (i >= xColony)// 当所有个体都作为0号个体进行变异过程后
 		{
-			select1();
+			select1(); //进行选择
 			Ni++; GenNum++; i = 0;
 			sumbest = dis_p[0];
 			for (j = 0; j<N_COLONY; j++)
 			if (sumbest>dis_p[j])
-				sumbest = dis_p[j];
-			printf("%d:%f\n", GenNum, sumbest);
+				sumbest = dis_p[j];//挑选种群中的最小距离 作为sumbest 种群的最好结果
+			printf("%d:%f\n", GenNum, sumbest);//输出当前遗传的代数和本次遗传的最好结果
 			if (GenNum % 2000 == 0 && GenNum<maxGen)
-				printBest(GenNum);
+				printBest(GenNum);//保存本次迭代的结果
 			if (GenNum >= maxGen)
 			{
 				timeNow = clock();
 				printf("Finial solution:");
 				printBest(GenNum);
-				exit(1);
+				exit(1);//如果到达迭代结果要求上限，则输出最后的结果 退出程序
 			}
 		}
 	}
 
 	return 1;
 }
-void select1()
+void select1()//优化操作 检查每个城市变异前后的距离 如果变异前后的距离能减小 则在种群中保留变异之后的个体及其信息 反之则保留变异之前的
 {
 	int j, k;
 	for (j = 0; j<N_COLONY; j++)
@@ -171,13 +171,10 @@ void init()//初始化种群的信息
 	printf("init success!!!\n");//将最强个体ibest初始化为0号个体 最好长度初始化为第一个个体的长度 初始化代数计数器为0
 }
 
-void invert(int pos_start, int pos_end)
+void invert(int pos_start, int pos_end) // 一个反转函数 用来反转temp起始点到结束点的所有路径。 
 {
 	int j, k, t;
 	if (pos_start<pos_end)
-	{
-		j = pos_start + 1; k = pos_end;
-		for (; j <= k; j++, k--)
 		{
 			t = temp[j]; temp[j] = temp[k]; temp[k] = t;
 		}
@@ -219,7 +216,7 @@ int position(int *tmp, int C)
 	if (*(tmp + j) == C)break;
 	return(j);//输入一个个体的城市下标数组tmp 和一个城市的编号c，输出这个C号城市在tmp里面的第几个下标处
 }
-void printBest(long GenNum)
+void printBest(long GenNum)//输出本次迭代的结果 将迭代用时 代数和最短距离放到文件里
 {
 	int i;
 	if ((fpme = fopen("e:\\tsp0.txt", "a")) == NULL)exit(0);
