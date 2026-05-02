@@ -39,32 +39,32 @@ int main()
 	init();
 	for (;;)//进行无限次循环
 	{
-		for (j = 0; j<xCity; j++)temp[j] = colony[i][j];
+		for (j = 0; j<xCity; j++)temp[j] = colony[i][j];  //记录temp的属性为种群0号个体的属性
 		disChange = 0; pos_flag = 0;
-		pos_C = rand() % xCity;
+		pos_C = rand() % xCity;//依旧随机数取随机城市，作为后续变异的候选城市
 		for (;;)
 		{
-			if ((rand() / 32768.0)<probab1)     //�ڱ�������
+			if ((rand() / 32768.0)<probab1)     //随机生成随机数，和概率值比较 如果小于概率设定 则进行变异过程
 			{
 				do
-				pos_C1 = rand() % xCity;
-				while (pos_C1 == pos_C);
-				C1 = colony[i][pos_C1];
+				pos_C1 = rand() % xCity; //再随机选择一个城市，直到前后随机到的城市不同
+				while (pos_C1 == pos_C); 
+				C1 = colony[i][pos_C1];//设定C1为i号种群的pos_C1城市
 			}
 			else
 			{
 				do
-				j = rand() % xColony;
+				j = rand() % xColony; //随机一个个体，直到随机到的个体不是0号个体
 				while (j == i);
-				k = position(colony[j], temp[pos_C]);
-				C1 = colony[j][(k + 1) % xCity];
-				pos_C1 = position(temp, C1);
+				k = position(colony[j], temp[pos_C]);//找到Cpos_C在j号个体的下标位置
+				C1 = colony[j][(k + 1) % xCity];//设置C1作为k后一个城市（如果K是最后一个城市，则C1设置为第一个城市）
+				pos_C1 = position(temp, C1);//设置pos_C1为0号城市中C1的下标
 			}
-			if ((pos_C + 1) % xCity == pos_C1 || (pos_C - 1 + xCity) % xCity == pos_C1)break;
+			if ((pos_C + 1) % xCity == pos_C1 || (pos_C - 1 + xCity) % xCity == pos_C1)break;//如果pos_C的下一个城市就是pos_C1  则退出循环
 			k1 = temp[pos_C];
 			k2 = temp[(pos_C + 1) % xCity];
 			l1 = temp[pos_C1];
-			l2 = temp[(pos_C1 + 1) % xCity];
+			l2 = temp[(pos_C1 + 1) % xCity];//分别提取pos_C 和 pos_C1及其各自下一个城市
 			disChange += city_dis[k1][l1] + city_dis[k2][l2] - city_dis[k1][k2] - city_dis[l1][l2];
 			invert(pos_C, pos_C1);
 			pos_flag++;
@@ -217,7 +217,7 @@ int position(int *tmp, int C)
 	int j;
 	for (j = 0; j<xCity; j++)
 	if (*(tmp + j) == C)break;
-	return(j);
+	return(j);//输入一个个体的城市下标数组tmp 和一个城市的编号c，输出这个C号城市在tmp里面的第几个下标处
 }
 void printBest(long GenNum)
 {
