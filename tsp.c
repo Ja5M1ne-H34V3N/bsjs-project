@@ -2,18 +2,18 @@
 #include<time.h>
 #include<stdlib.h>
 #include<stdio.h>
-#define FILE_PATH  "./pcb442.tsp","r"  //�����ļ���
-#define N_COLONY 100  // N_COLONY>=xColony
+#define FILE_PATH  "pcb442/pcb442.tsp","r"  //ļ
+#define N_COLONY 200  // N_COLONY>=xColony
 #define CITY     442  // CITY>=xCity
-int     xColony = 100;     //##//  ������
+int     xColony = 200;     //##//  
 int     xCity = CITY;
-double  probab1 = 0.02;    //##//  �������
-long    NOCHANGE = 200000;  //##//  ���ֹͣ�ı����
-long    maxGen = 200000;    //##//  ͣ������
+double  probab1 = 0.02;    //##//  
+long    NOCHANGE = 200000;  //##//  ֹͣı
+long    maxGen = 200000;    //##//  ͣ
 int     colony[N_COLONY * 2][CITY], colony2[N_COLONY][CITY]; //zhongqun 
 double  cityXY[CITY][2];
 double  city_dis[CITY][CITY];
-double  dis_p[N_COLONY * 2]; //��Ӧֵ
+double  dis_p[N_COLONY * 2]; //Ӧֵ
 double  sumbest, sumTemp;
 int     temp[CITY], ibest;
 clock_t timeStart, timeNow, timeTemp;
@@ -86,7 +86,7 @@ int main()
 			for (j = 0; j<N_COLONY; j++)
 			if (sumbest>dis_p[j])
 				sumbest = dis_p[j];//挑选种群中的最小距离 作为sumbest 种群的最好结果
-			printf("%d:%f\n", GenNum, sumbest);//输出当前遗传的代数和本次遗传的最好结果
+			printf("%ld:%f\n", GenNum, sumbest);//输出当前遗传的代数和本次遗传的最好结果
 			if (GenNum % 2000 == 0 && GenNum<maxGen)
 				printBest(GenNum);//保存本次迭代的结果
 			if (GenNum >= maxGen)
@@ -123,7 +123,7 @@ void init()//初始化种群的信息
 	fscanf(fp, "%d", &xCity);
 	for (i = 0; i<xCity; i++)      /*  init cityXY[][]  */
 	{
-		fscanf(fp, "%*d%Lf%Lf", &x, &y);
+		fscanf(fp, "%*d%lf%lf", &x, &y);
 		cityXY[i][0] = x;
 		cityXY[i][1] = y;
 	}
@@ -222,12 +222,12 @@ int position(int *tmp, int C)
 void printBest(long GenNum)//输出本次迭代的结果 将迭代用时 代数和最短距离放到文件里
 {
 	int i;
-	if ((fpme = fopen("e:\\tsp0.txt", "a")) == NULL)exit(0);
+	if ((fpme = fopen("tsp0.txt", "a")) == NULL)exit(0);
 	//fprintf(fpme,"\n   CITY      %d\t\tN_COLONY  %d",CITY,N_COLONY);
 	//fprintf(fpme,"\ntime     %4.2f",(double)(timeNow-timeStart)/CLOCKS_PER_SEC);
 	//fprintf(fpme,"\n   distance  %f",sumbest);
 	//fprintf(fpme,"\n   GenNum    %d\n\n",GenNum);
-	fprintf(fpme, "%d\t%4.2f\t%d\n", GenNum, (double)(timeNow - timeStart) / CLOCKS_PER_SEC, (int)sumbest);
+	fprintf(fpme, "%ld\t%4.2f\t%d\n", GenNum, (double)(timeNow - timeStart) / CLOCKS_PER_SEC, (int)sumbest);
 	fclose(fpme);
 
 }
@@ -245,4 +245,3 @@ double path(int tmp[], int k1, int k2)
 	}
 	return temp_dis;
 }
-
