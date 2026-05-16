@@ -1,0 +1,208 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{ctex} % 支持中文
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{geometry}
+\usepackage{hyperref}
+
+\geometry{left=2.5cm,right=2.5cm,top=3cm,bottom=3cm}
+
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+\lstset{
+    language=C,
+    backgroundcolor=\color{backcolour},
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\small,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=5pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=4,
+    extendedchars=false
+}
+
+\begin{document}
+
+\section{实验一：并行遗传算法求解旅行商问题 (TSP)}
+
+\subsection{算法背景与分布式并行思路}
+本实验针对经典的旅行商问题（TSP），采用分布式并行遗传算法（Island Model GA）进行优化。相比于传统的串行遗传算法，并行方案通过多个进程（岛屿）独立进化，并定期进行优良个体迁移，能够有效维持种群多样性，跳出局部最优解。
+
+\textbf{并行参数设计：}
+\begin{itemize}
+    \item \textbf{迁移间隔 (Migration Interval)}：每隔一定代数（如 2000 代）进行一次数据交换。
+    \item \textbf{迁移数量 (Migration Count)}：每次迁移 2 个优良个体。
+    \item \textbf{迁移拓扑 (Migration Topology)}：实现了 \texttt{island} (All-to-All) 和 \texttt{chain} (Ring) 两种模式。
+    \item \textbf{迁移策略 (Migration Strategy)}：选择当前种群中最优个体进行迁移（\texttt{best}）。
+\end{itemize}
+
+\subsection{核心代码实现与注释}
+并行化改进主要体现在 \texttt{main} 函数中的迁移触发和独立的 \texttt{migrate\_if\_needed} 函数。
+
+\begin{lstlisting}[caption={并行 TSP 核心逻辑与注释 (mpitsp.c)}]
+// 主循环中的迁移调用
+for (GenNum = 0; GenNum < maxGen; GenNum++) {
+    for (int i = 0; i < xColony; i++)
+        local_improve_one(i); // 执行局部搜索优化个体路径
+    select1_local(); // 比较新老个体，保留距离更短的解
+    migrate_if_needed(rank, size); // 到达迁移代数时，在进程间交换优良个体
+}
+
+// 迁移函数的并行实现
+static void migrate_if_needed(int rank, int size) {
+    if (GenNum % migration_interval != 0) return;
+    
+    // 选出最优个体索引并打包
+    int send_idx[N_COLONY];
+    pick_k_indices(send_idx, migration_count, 1 /* pick_best */);
+    
+    int send_buf[N_COLONY * CITY];
+    for (int m = 0; m < migration_count; m++)
+        memcpy(&send_buf[m * xCity], colony[send_idx[m]], xCity * sizeof(int));
+
+    if (topo == TOPO_CHAIN_RING) {
+        // 环形拓扑：使用 MPI_Sendrecv 实现相邻进程数据双向交换
+        MPI_Sendrecv(send_buf, migration_count * xCity, MPI_INT, next, 100,
+                     recv_buf, migration_count * xCity, MPI_INT, prev, 100, 
+                     MPI_COMM_WORLD, &st);
+    } else {
+        // 全连接拓扑：使用 MPI_Allgather 汇总所有进程的优良个体
+        MPI_Allgather(send_buf, migration_count * xCity, MPI_INT,
+                      all_buf, migration_count * xCity, MPI_INT, MPI_COMM_WORLD);
+    }
+    // 注入接收到的外部基因，替换本地最差个体
+    replace_k_individuals(recv_buf, migration_count, 1 /* replace_worst */);
+}
+\end{lstlisting}
+
+\subsection{实验结果与统计分析}
+实验采用 \texttt{pcb442.tsp} 实例。通过对 \texttt{res/results\_raw.txt} 中的串行（Serial）与并行（MPI, P=4）各 30 次实验数据进行统计，得到如下结果。
+
+\subsubsection{统计计算公式}
+1. \textbf{样本均值 ($\bar{x}$)}:
+$$\bar{x} = \frac{1}{n} \sum_{i=1}^{n} x_i$$
+
+2. \textbf{样本标准差 ($s$)}:
+$$s = \sqrt{\frac{\sum_{i=1}^{n} (x_i - \bar{x})^2}{n-1}}$$
+
+3. \textbf{独立样本 $t$ 检验统计量 ($t$)}:
+针对两组样本量相同 ($n_1=n_2=30$) 且方差接近的情况，使用合并方差 $s_p^2$:
+$$s_p^2 = \frac{(n_1-1)s_1^2 + (n_2-1)s_2^2}{n_1+n_2-2}$$
+$$t = \frac{\bar{x}_1 - \bar{x}_2}{\sqrt{s_p^2 (\frac{1}{n_1} + \frac{1}{n_2})}}$$
+
+\subsubsection{实验数据与计算结果}
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+算法方案 & 样本量 & 平均距离 ($\bar{x}$) & 标准差 ($s$) & 最好成绩 (Min) \\ \midrule
+串行 GA (task1) & 30 & 51587.13 & 144.35 & 51241.0 \\
+并行 GA (task2) & 30 & 51351.80 & 133.48 & 51103.0 \\ \bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{T 检验结果}:
+代入公式计算得到 $t = 6.5561$。
+对于自由度 $df = n_1 + n_2 - 2 = 58$，在置信水平 $\alpha = 0.01$ 下，临界值 $t_{0.005, 58} \approx 2.66$。
+
+\subsubsection{结论分析}
+由于计算得到的 $t = 6.5561$ 远大于临界值 $2.66$，且 $p$-value 极小，我们有充足的理由**拒绝原假设**。这证明了并行遗传算法（MPI 岛模型）在相同迭代代数下，其解的质量显著优于串行遗传算法。
+其核心原因在于：
+\begin{itemize}
+    \item \textbf{种群多样性}：四个并行进程（岛屿）从不同的随机种子出发，探索了搜索空间的不同区域。
+    \item \textbf{迁移机制}：定期交换优良个体，使得各个进程能够借鉴其他岛屿进化的“经验”，加速了向全局最优解的收敛过程。
+\end{itemize}
+
+\section{实验二：并行 K-means 聚类算法}
+
+\subsection{数据集说明与实际意义}
+本次实验使用 \textbf{Iris (鸢尾花) 数据集}。
+\begin{itemize}
+    \item \textbf{数据特征}：包含 150 个样本，4 个维度（花瓣/花萼的长宽）。
+    \item \textbf{实际意义}：鸢尾花数据集是聚类分析的标准 benchmark。在此数据集上运行 K-means 的实际意义在于通过无监督学习，仅凭借植物形态学尺寸，自动将 150 朵花归类为 3 个物种。这对生物分类、自动识别等领域具有研究价值。
+\end{itemize}
+
+\subsection{并行化设计思想}
+在 K-means 的并行化中，我们面临两种选择：
+1. \textbf{任务并行}（每个进程负责一个类中心）：不可取，因为 $K=3$ 无法利用多核优势。
+2. \textbf{数据并行}（每个进程负责部分样本点的距离计算）：**本实验采用的方案**。
+
+\textbf{具体实现步骤：}
+\begin{itemize}
+    \item \textbf{分配阶段}：每个进程仅处理 $1/P$ 规模的数据点。
+    \item \textbf{局部统计}：每个进程计算本地样本点到 $K$ 个中心的最近距离，并累加到本地的 \texttt{sum\_local} 和 \texttt{cnt\_local} 数组中。
+    \item \textbf{全局同步}：利用 \textbf{\texttt{MPI\_Allreduce}} 函数。将所有进程的局部和进行累加汇总，并同步到所有进程。其操作类似于先求和再广播。
+\end{itemize}
+
+\subsection{并行核心代码实现}
+\begin{lstlisting}[caption={并行 K-means 数据规约逻辑 (mpikmeans.c)}]
+// 1. 各进程计算本地归属并统计部分和
+for (int i = begin; i < end; i++) {
+    int bestk = find_nearest_centroid(X[i], C);
+    cnt_local[bestk]++;
+    for (int j = 0; j < DIM; j++) sum_local[bestk][j] += X[i][j];
+}
+
+// 2. 使用 MPI_Allreduce 实现全局规约更新
+// 将各进程算得的坐标总和 sum_local 累加到 sum_global
+MPI_Allreduce(sum_local, sum_global, K*DIM, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+// 将各进程算得的计数 cnt_local 累加到 cnt_global
+MPI_Allreduce(cnt_local, cnt_global, K, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+
+// 3. 所有进程同步更新中心点
+for (int k = 0; k < K; k++) {
+    for (int j = 0; j < DIM; j++) C[k][j] = sum_global[k][j] / cnt_global[k];
+}
+\end{lstlisting}
+
+\subsection{实验结果展示}
+通过在本地环境运行串行与并行程序（$P=4$），得到的结果如下：
+
+\subsubsection{串行 K-means 运行结果}
+\begin{lstlisting}[backgroundcolor=\color{backcolour}]
+Serial k-means on iris: n=149, k=3, dim=4
+C0 (count=39): 6.8538 3.0769 5.7154 2.0538
+C1 (count=60): 5.8983 2.7483 4.4067 1.4417
+C2 (count=50): 5.0060 3.4280 1.4620 0.2460
+SSE=76.467679
+\end{lstlisting}
+
+\subsubsection{并行 MPI K-means 运行结果}
+\begin{lstlisting}[backgroundcolor=\color{backcolour}]
+MPI k-means on iris: n=149, k=3, dim=4, P=4
+C0 (count=39): 6.8538 3.0769 5.7154 2.0538
+C1 (count=60): 5.8983 2.7483 4.4067 1.4417
+C2 (count=50): 5.0060 3.4280 1.4620 0.2460
+SSE=76.467679
+Parallel strategy: data-parallel (each rank handles ~n/P points, Allreduce sums/counts)
+\end{lstlisting}
+
+\subsection{结果分析}
+从运行结果可以看出：
+1. \textbf{数值一致性}：并行版本与串行版本得到的各个簇的中心点坐标、样本计数以及最终的误差平方和 (SSE) 完全一致。这证明了基于 \texttt{MPI\_Allreduce} 的全局规约思路在逻辑上是严谨且正确的。\\
+2. \textbf{并行优势}：并行程序通过 \texttt{n/P} 的数据划分，使得每个进程计算距离的开销降低到原来的四分之一。对于像 Iris 这样的小规模数据集，加速效果虽然在毫秒级不明显，但对于百万量级的大数据，这种“数据并行”的架构将展现出显著的性能提升。
+
+\section{实验分析与结论}
+1. \textbf{解质量提升}：并行 GA 的“岛屿模型”由于维持了多个独立的进化搜索路径，并通过迁移增强了信息交换，有效避免了串行 GA 易陷入局部最优的问题。T 检验结果明确证明了并行化带来的质量飞跃。\\
+2. \textbf{并行效率}：并行 K-means 通过数据均衡划分和高效的规约操作（Allreduce），消除了计算瓶颈，适合大规模聚类任务。
+通过本次实验，我们深入理解了如何利用 MPI 的点对点通信（Sendrecv）和集体通信（Allreduce）来改造传统算法，实现高性能计算。
+
+\end{document}
+

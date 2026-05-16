@@ -52,7 +52,7 @@ static void migrate_if_needed(int rank, int size);
 static void parse_args_or_die(int rank, int argc, char **argv);
 static void usage_and_exit(int rank, const char *prog);
 
-static void usage_and_exit(int rank, const char *prog)
+static void usage_and_exit(int rank, const char *prog) // 如果参数输入的不对就直接打印参数输入方法，然后结束程序
 {
     if (rank == 0)
     {
@@ -66,11 +66,11 @@ static void usage_and_exit(int rank, const char *prog)
                 "Example : mpirun -np 4 %s 2000 4 island best 20000\n",
                 prog, prog);
     }
-    MPI_Abort(MPI_COMM_WORLD, 2);
+    MPI_Abort(MPI_COMM_WORLD, 2); //异常就退出
     exit(2);
 }
 
-static void parse_args_or_die(int rank, int argc, char **argv)
+static void parse_args_or_die(int rank, int argc, char **argv)  //接收启动程序时的参数
 {
     if (argc < 5)
         usage_and_exit(rank, argv[0]);
@@ -82,12 +82,12 @@ static void parse_args_or_die(int rank, int argc, char **argv)
         if (rank == 0)
             fprintf(stderr, "Invalid migration_interval/migration_count. interval>0, 1<=count<=%d\n", xColony);
         usage_and_exit(rank, argv[0]);
-    }
+    } //遗传频率和数量填写发生问题时报错退出
 
     if (strcmp(argv[3], "island") == 0 || strcmp(argv[3], "all") == 0)
         topo = TOPO_ISLAND;
     else if (strcmp(argv[3], "chain") == 0 || strcmp(argv[3], "ring") == 0 || strcmp(argv[3], "line") == 0)
-        topo = TOPO_CHAIN_RING;
+        topo = TOPO_CHAIN_RING;//遗传拓扑发生问题时报错退出
     else
     {
         if (rank == 0)
@@ -103,10 +103,10 @@ static void parse_args_or_die(int rank, int argc, char **argv)
     {
         if (rank == 0)
             fprintf(stderr, "Invalid strategy: %s\n", argv[4]);
-        usage_and_exit(rank, argv[0]);
+        usage_and_exit(rank, argv[0]); // 接收遗传策略参数，并将正确的参数传到全局变量
     }
 
-    /* 可选：maxGen */
+    /* 可选：maxGen 控制最大迭代次数 ，可填可不填*/
     if (argc >= 6)
     {
         long v = atol(argv[5]);
@@ -123,20 +123,20 @@ int main(int argc, char **argv)
 
     int rank, size;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    MPI_Comm_size(MPI_COMM_WORLD, &size); // 获取总进程数和当前进程编号
 
     parse_args_or_die(rank, argc, argv);
 
     /* 每个rank用不同随机种子，保证岛之间变化的多样性 */
-    init_data_and_population(rank);
+    init_data_and_population(rank); // 根据rank初始化不同的种群起点
 
     /* rank0 输出到 txt（名字与 tsp.c 的 tsp0.txt 不同） */
     FILE *fpout = NULL;
     clock_t timeStart = 0;
     if (rank == 0)
     {
-        fpout = fopen(OUTPUT_TXT, "a");
-        timeStart = clock();
+        fpout = fopen(OUTPUT_TXT, "a"); // 打开文件准备记录实验数据
+        timeStart = clock(); //用来计算运行时间的，不重要
 
         fprintf(stdout,
                 "MPI TSP island-model GA start: P=%d, interval=%ld, count=%d, topo=%s, strategy=%s\n",
@@ -161,13 +161,13 @@ int main(int argc, char **argv)
     {
         /* 一代：对每个个体做一次局部改进 */
         for (int i = 0; i < xColony; i++)
-            local_improve_one(i);
+            local_improve_one(i); // 执行局部搜索优化个体路径
 
         /* 选择：保留改进后的更优解 */
-        select1_local();
+        select1_local(); // 比较新老个体，保留距离更短的解
 
         /* 迁移（岛模型） */
-        migrate_if_needed(rank, size);
+        migrate_if_needed(rank, size); // 到达迁移代数时，在进程间交换优良个体
 
         /* 打印全局最优（每隔若干代） */
         if ((GenNum % 2000) == 0)
@@ -178,11 +178,11 @@ int main(int argc, char **argv)
                     local_best = dis_p[i];
 
             double global_best = 0.0;
-            MPI_Allreduce(&local_best, &global_best, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
+            MPI_Allreduce(&local_best, &global_best, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD); // 汇总所有进程的最优值
 
             if (rank == 0)
             {
-                printf("%ld:%f\n", GenNum, global_best);
+                printf("%ld:%f\n", GenNum, global_best); // 只有主进程负责在屏幕上打印进度
 
                 if (fpout)
                 {
@@ -197,13 +197,13 @@ int main(int argc, char **argv)
         }
     }
 
-    /* 最终输出全局最优 */
+    //最终输出全局最优
     double local_best = dis_p[0];
     for (int i = 1; i < xColony; i++)
         if (dis_p[i] < local_best)
             local_best = dis_p[i];
     double global_best = 0.0;
-    MPI_Allreduce(&local_best, &global_best, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
+    MPI_Allreduce(&local_best, &global_best, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD); // 结束前最后一次全进程同步
     if (rank == 0)
     {
         printf("Final best distance: %f\n", global_best);
@@ -217,7 +217,7 @@ int main(int argc, char **argv)
             fclose(fpout);
             fpout = NULL;
         }
-    }
+    }// 主进程输出最好的成绩
 
     MPI_Finalize();
     return 0;
@@ -237,7 +237,7 @@ static void init_data_and_population(int rank)
     for (int i = 0; i < xCity; i++)
     {
         double x, y;
-        if (fscanf(fp, "%*d%lf%lf", &x, &y) != 2)
+        if (fscanf(fp, "%*d%lf%lf", &x, &y) != 2) // 读取文件的城市ID和坐标
         {
             fprintf(stderr, "Rank %d: failed to read city coord at line %d\n", rank, i);
             MPI_Abort(MPI_COMM_WORLD, 1);
@@ -246,7 +246,7 @@ static void init_data_and_population(int rank)
         cityXY[i][0] = x;
         cityXY[i][1] = y;
     }
-    fclose(fp);
+    fclose(fp); // 坐标读入完成，关闭文件
 
     for (int i = 0; i < xCity; i++)
     {
@@ -256,7 +256,7 @@ static void init_data_and_population(int rank)
             {
                 double d = (cityXY[i][0] - cityXY[j][0]) * (cityXY[i][0] - cityXY[j][0]) +
                            (cityXY[i][1] - cityXY[j][1]) * (cityXY[i][1] - cityXY[j][1]);
-                city_dis[i][j] = (int)(sqrt(d) + 0.5);
+                city_dis[i][j] = (int)(sqrt(d) + 0.5); // 计算城市间距离并四舍五入
             }
             else if (j == i)
             {
@@ -269,7 +269,7 @@ static void init_data_and_population(int rank)
         }
     }
 
-    /* rank相关随机种子 */
+    // 设置rank相关随机种子
     srand((unsigned)time(NULL) ^ (unsigned)(rank * 0x9e3779b1));
 
     int array[CITY];
@@ -299,6 +299,7 @@ static void init_data_and_population(int rank)
 }
 
 static double compute_distance_of_path(const int *path)
+// 计算给定路径的总距离
 {
     double d = 0;
     for (int j = 0; j < xCity - 1; j++)
@@ -308,6 +309,7 @@ static double compute_distance_of_path(const int *path)
 }
 
 static int position_in(int *tmp, int C)
+// 查找城市C在路径数组中的位置
 {
     for (int j = 0; j < xCity; j++)
         if (tmp[j] == C)
@@ -371,6 +373,7 @@ static void invert_segment(int pos_start, int pos_end)
 }
 
 static void local_improve_one(int idx)
+// 对种群中索引为idx的个体进行局部优化（2-opt/变异逻辑）
 {
     int C1, j, k, pos_C, pos_C1;
     int k1, k2, l1, l2, pos_flag;
@@ -430,6 +433,7 @@ static void local_improve_one(int idx)
 }
 
 static void select1_local()
+// 本地选择过程：如果新生成的个体更好，则替换旧个体
 {
     for (int j = 0; j < xColony; j++)
     {
@@ -444,6 +448,7 @@ static void select1_local()
 
 /* ===== 迁移（岛模型） ===== */
 static void pick_k_indices(int *out_idx, int k, int pick_best)
+// 根据策略选出k个最好或最坏个体的索引
 {
     for (int t = 0; t < k; t++)
     {
@@ -479,6 +484,7 @@ static void pick_k_indices(int *out_idx, int k, int pick_best)
 }
 
 static void replace_k_individuals(const int *incoming, int incoming_cnt, int replace_worst)
+// 用接收到的外部个体替换本地较差的个体
 {
     /* 选择要被替换的本地个体：通常替换最差的 */
     int repl_idx[N_COLONY];
@@ -498,6 +504,7 @@ static void replace_k_individuals(const int *incoming, int incoming_cnt, int rep
 }
 
 static void migrate_if_needed(int rank, int size)
+// 迁移逻辑主函数：按代数间隔进行进程间的数据交换
 {
     if (migration_interval <= 0)
         return;
